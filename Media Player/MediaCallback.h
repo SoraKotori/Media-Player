@@ -28,6 +28,7 @@ typedef struct DeviceType
 
 typedef struct MediaDeviceSet
 {
+	IMFActivate **ppActivate;
 	LPWSTR *pDeviceName;
 	IMFMediaSource **ppSource;
 	DeviceType *pDeviceType;
@@ -69,6 +70,7 @@ interface MediaAsyncCallback
 	CONST_VTBL struct MediaAsyncCallbackVtbl *lpVtbl;
 	ULONG RefCount;
 	IMFMediaSession *pSession;
+	IMFMediaSource *pSource;
 	IMFVideoDisplayControl *pDisplayControl;
 	HANDLE CloseEvent;
 	MediaState State;

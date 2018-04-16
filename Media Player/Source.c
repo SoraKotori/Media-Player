@@ -39,11 +39,6 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdL
 	MSG msg;
 	while (FALSE != (bResult = GetMessage(&msg, NULL, 0, 0)))
 	{
-		if (FALSE == bResult)
-		{
-			assert(FALSE);
-		}
-
 		if (!TranslateAccelerator(msg.hwnd, NULL, &msg))
 		{
 			TranslateMessage(&msg);

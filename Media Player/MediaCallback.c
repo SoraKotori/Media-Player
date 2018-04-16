@@ -166,7 +166,7 @@ HRESULT MediaDeviceTypeCreate(IMFMediaSource *pSource, DeviceType *pDeviceType)
 	return hResult;
 }
 
-HRESULT MediaDeviceActivate(IMFActivate *pActivate, LPWSTR *pDeviceName, IMFMediaSource **ppSource, DeviceType *pDeviceType)
+HRESULT MediaDeviceActivate(IMFActivate *pActivate, LPWSTR *pDeviceName, DeviceType *pDeviceType)
 {
 	LPWSTR DeviceName = NULL;
 	UINT32 cchLength = 0;
@@ -190,8 +190,14 @@ HRESULT MediaDeviceActivate(IMFActivate *pActivate, LPWSTR *pDeviceName, IMFMedi
 		return hResult;
 	}
 
+	hResult = IMFMediaSource_Shutdown(pSource);
+	if (FAILED(hResult))
+	{
+		return hResult;
+	}
+	IMFMediaSource_Release(pSource);
+
 	*pDeviceName = DeviceName;
-	*ppSource = pSource;
 	return hResult;
 }
 
@@ -206,14 +212,13 @@ HRESULT MediaDeviceSetCreate(MediaDeviceSet *pDeviceSet)
 		return hResult;
 	}
 
-	LPWSTR *pDeviceName = (LPWSTR*)HeapAlloc(GetProcessHeap(), 0UL, sizeof(LPWSTR) * ActivateCount);
-	if (NULL == pDeviceName)
+	if (0U == ActivateCount)
 	{
-		return S_FALSE;
+		return MF_E_NOT_FOUND;
 	}
 
-	IMFMediaSource **ppSource = (IMFMediaSource**)HeapAlloc(GetProcessHeap(), 0UL, sizeof(IMFMediaSource*) * ActivateCount);
-	if (NULL == ppSource)
+	LPWSTR *pDeviceName = (LPWSTR*)HeapAlloc(GetProcessHeap(), 0UL, sizeof(LPWSTR) * ActivateCount);
+	if (NULL == pDeviceName)
 	{
 		return S_FALSE;
 	}
@@ -226,16 +231,14 @@ HRESULT MediaDeviceSetCreate(MediaDeviceSet *pDeviceSet)
 
 	for (UINT32 ActivateIndex = 0; ActivateIndex < ActivateCount; ActivateIndex++)
 	{
-		hResult = MediaDeviceActivate(ppActivate[ActivateIndex], &pDeviceName[ActivateIndex], &ppSource[ActivateIndex], &pDeviceType[ActivateIndex]);
+		hResult = MediaDeviceActivate(ppActivate[ActivateIndex], &pDeviceName[ActivateIndex], &pDeviceType[ActivateIndex]);
 		if (FAILED(hResult))
 		{
 			return hResult;
 		}
-		IMFActivate_Release(ppActivate[ActivateIndex]);
 	}
-	CoTaskMemFree(ppActivate);
 
-	pDeviceSet->ppSource = ppSource;
+	pDeviceSet->ppActivate = ppActivate;
 	pDeviceSet->pDeviceName = pDeviceName;
 	pDeviceSet->pDeviceType = pDeviceType;
 	pDeviceSet->DeviceCount = ActivateCount;
@@ -287,6 +290,7 @@ HRESULT MediaDeviceTypeRelease(DeviceType *pDeviceType)
 
 HRESULT MediaDeviceSetRelease(MediaDeviceSet *pDeviceSet)
 {
+	IMFActivate **ppActivate = pDeviceSet->ppActivate;
 	LPWSTR *pDeviceName = pDeviceSet->pDeviceName;
 	IMFMediaSource **ppSource = pDeviceSet->ppSource;
 	DeviceType *pDeviceType = pDeviceSet->pDeviceType;
@@ -294,14 +298,14 @@ HRESULT MediaDeviceSetRelease(MediaDeviceSet *pDeviceSet)
 
 	for (UINT32 DeviceIndex = 0; DeviceIndex < DeviceCount; DeviceIndex++)
 	{
-		CoTaskMemFree(pDeviceName[DeviceIndex]);
-
-		HRESULT hResult = IMFMediaSource_Shutdown(ppSource[DeviceIndex]);
+		HRESULT hResult = IMFActivate_ShutdownObject(ppActivate[DeviceIndex]);
 		if (FAILED(hResult))
 		{
 			return hResult;
 		}
-		IMFMediaSource_Release(ppSource[DeviceIndex]);
+		IMFActivate_Release(ppActivate[DeviceIndex]);
+
+		CoTaskMemFree(pDeviceName[DeviceIndex]);
 
 		hResult = MediaDeviceTypeRelease(&pDeviceType[DeviceIndex]);
 		if (FAILED(hResult))
@@ -309,6 +313,8 @@ HRESULT MediaDeviceSetRelease(MediaDeviceSet *pDeviceSet)
 			return hResult;
 		}
 	}
+
+	CoTaskMemFree(ppActivate);
 
 	BOOL Result = HeapFree(GetProcessHeap(), 0UL, pDeviceName);
 	if (FALSE == Result)
@@ -357,8 +363,6 @@ HRESULT MediaDeviceSetSource(MediaDeviceSet *pDeviceSet, UINT32 DeviceIndex, UIN
 	*ppSource = pDeviceSet->ppSource[DeviceIndex];
 	return hResult;
 }
-
-
 
 HRESULT MediaCreateActivate(IMFStreamDescriptor *pStreamDescriptor, HWND hwndVideo, IMFActivate **ppActivate)
 {
@@ -724,6 +728,13 @@ STDMETHODIMP_(HRESULT) Media_Shutdown(MediaAsyncCallback *pAsyncCallback)
 		return S_FALSE;
 	}
 
+	hResult = IMFMediaSource_Shutdown(pAsyncCallback->pSource);
+	if (FAILED(hResult))
+	{
+		return hResult;
+	}
+	IMFMediaSource_Release(pAsyncCallback->pSource);
+
 	hResult = IMFMediaSession_Shutdown(pAsyncCallback->pSession);
 	if (FAILED(hResult))
 	{
@@ -737,7 +748,14 @@ STDMETHODIMP_(HRESULT) Media_Shutdown(MediaAsyncCallback *pAsyncCallback)
 
 STDMETHODIMP_(HRESULT) Media_Open(MediaAsyncCallback *pAsyncCallback, IMFMediaSource *pSource, HWND hwndVideo)
 {
-	return MediaSessionSetTopology(pAsyncCallback->pSession, pSource, hwndVideo);
+	HRESULT hResult = MediaSessionSetTopology(pAsyncCallback->pSession, pSource, hwndVideo);
+	if (FAILED(hResult))
+	{
+		return hResult;
+	}
+
+	pAsyncCallback->pSource = pSource;
+	return S_OK;
 }
 
 STDMETHODIMP_(HRESULT) Media_Repaint(MediaAsyncCallback *pAsyncCallback)

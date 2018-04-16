@@ -159,7 +159,7 @@ int MediaFormatComboBoxUpdate(HWND FormathWnd, MediaDeviceSet *pDeviceSet, int D
 	return CB_OKAY;
 }
 
-BOOL MediaCreateWindow(MediaPlayer *pPlayer, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HINSTANCE hInstance)
+BOOL MediaWindowCreate(MediaPlayer *pPlayer, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HINSTANCE hInstance)
 {
 	MediaDeviceSet *pDeviceSet = &pPlayer->DeviceSet;
 	MediaAsyncCallback *pAsyncCallback = &pPlayer->AsyncCallback;
@@ -243,7 +243,6 @@ BOOL MediaCreateWindow(MediaPlayer *pPlayer, int X, int Y, int nWidth, int nHeig
 		return FALSE;
 	}
 
-
 	return TRUE;
 }
 
@@ -261,7 +260,7 @@ BOOL MediaPlayerCreate(MediaPlayer *pPlayer, int X, int Y, int nWidth, int nHeig
 		return FALSE;
 	}
 
-	BOOL bResult = MediaCreateWindow(pPlayer, X, Y, nWidth, nHeight, hWndParent, hInstance);
+	BOOL bResult = MediaWindowCreate(pPlayer, X, Y, nWidth, nHeight, hWndParent, hInstance);
 	if (FALSE == bResult)
 	{
 		return FALSE;
@@ -313,10 +312,10 @@ BOOL AutoSetWindowPos(HWND hWnd, LONG Width, LONG Height)
 		return FALSE;
 	}
 
-	int X = (int)(Rect.right - Rect.left);
-	int Y = (int)(Rect.bottom - Rect.top);
+	int cx = (int)(Rect.right - Rect.left);
+	int cy = (int)(Rect.bottom - Rect.top);
 
-	bResult = SetWindowPos(hWnd, HWND_TOP, 0, 0, X, Y, SWP_NOMOVE | SWP_NOOWNERZORDER);
+	bResult = SetWindowPos(hWnd, HWND_TOP, 0, 0, cx, cy, SWP_NOMOVE | SWP_NOOWNERZORDER);
 	if (FALSE == bResult)
 	{
 		return FALSE;
